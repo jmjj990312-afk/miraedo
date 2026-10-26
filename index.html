@@ -290,6 +290,14 @@ footer p{margin:6px 0}
   .bbar a{font-size:14px;gap:5px}
   .bbar .b2{font-size:15px}
 }
+#pop{position:fixed;inset:0;z-index:120;background:rgba(5,15,14,.6);display:none;align-items:center;justify-content:center;padding:20px}
+#pop.on{display:flex}
+.pbox{background:#fff;border-radius:18px;max-width:380px;width:100%;padding:30px 24px 22px;text-align:center;border-top:6px solid var(--gold);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.pic{width:56px;height:56px;border-radius:50%;background:var(--green);color:var(--gold2);font-size:30px;line-height:56px;margin:0 auto 14px}
+.pt1{font-family:'Nanum Myeongjo',serif;font-weight:800;font-size:19px;color:var(--green);line-height:1.45;margin:0}
+.pt2{margin:10px 0 0;font-size:15px;color:var(--sub)}
+.pt2 b{color:var(--gold)}
+#popOk{margin-top:20px;width:100%;border:0;border-radius:10px;background:var(--green);color:#fff;font:inherit;font-size:17px;font-weight:700;padding:14px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -740,6 +748,13 @@ footer p{margin:6px 0}
 
 <div class="lb" id="lb" role="dialog" aria-label="사진 크게 보기"><button type="button" aria-label="닫기">×</button><img alt=""></div>
 
+<div id="pop" role="dialog" aria-modal="true" aria-labelledby="popT"><div class="pbox">
+  <div class="pic">✓</div>
+  <p id="popT" class="pt1">예약상담 신청이 정상적으로 접수되었습니다.</p>
+  <p class="pt2">담당자가 확인 후 빠르게 연락드리겠습니다.<br>급하신 경우 <a href="tel:16444147"><b>1644-4147</b></a>로 전화 주세요.</p>
+  <button type="button" id="popOk">확인</button>
+</div></div>
+
 <script>
 /* 네이버 검색광고 > 도구 > 프리미엄 로그분석에서 받은 계정 ID(예: s_xxxxxxxxxx)를 넣으면
    방문·전화클릭·예약상담 전환이 집계됩니다. 비워두면 아무것도 불러오지 않습니다. */
@@ -756,7 +771,7 @@ document.querySelectorAll('a[href^="tel:"]').forEach(function(a){a.addEventListe
 /* 문자 받을 번호 */
 var SMS_TO = '01058558939';
 /* 구글 Apps Script 웹앱 주소를 넣으면 버튼 한 번에 시트로 바로 접수됩니다 (비워두면 문자앱이 열림) */
-var SCRIPT_URL = '';
+var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwev4WL2QVS-IWla4TNZ1VZk8h2dPaQiTQmTE8jb0AC8lqeI2LxrMehxVe8lumS8XRS/exec';
 
 // 홍보영상 소리 켜기
 (function(){var v=document.getElementById('pvv'),b=document.getElementById('snd');
@@ -800,14 +815,27 @@ f.addEventListener('submit',function(e){
   naverCnv('4');
   var body='[앤네이처 미래도 예약상담]\n성함: '+data.name+'\n연락처: '+data.tel+'\n관심타입: '+data.type+
     (data.date?'\n방문희망일: '+data.date:'')+(data.msg?'\n문의: '+data.msg:'');
-  if(SCRIPT_URL){
-    fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(data)})
-      .then(function(){finish('예약상담이 접수되었습니다. 곧 연락드리겠습니다.')})
-      .catch(function(){openSms(body)});
-  }else{
+  var mobile=isMobile();
+  data.site='앤네이처 미래도'+(mobile?'(모바일)':'(PC)');
+  if(SCRIPT_URL&&mobile){
+    // 휴대폰: 구글 시트 기록 + 담당자에게 문자앱으로 전송
+    try{fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',keepalive:true,headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(data)});}catch(x){}
+    setTimeout(function(){openSms(body)},250);
+  }else if(SCRIPT_URL){
+    // PC: 구글 시트 기록 + 담당자 휴대폰으로 문자 자동 발송 + 완료 팝업
+    done.textContent='접수 중입니다...';done.classList.add('show');
+    fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(data)})
+      .then(function(){finish('예약상담이 정상적으로 접수되었습니다. 곧 연락드리겠습니다.');showPop();})
+      .catch(function(){finish('접수 중 문제가 생겼습니다. 대표전화 1644-4147로 연락 주세요.')});
+  }else if(mobile){
     openSms(body);
+  }else{
+    finish('PC에서는 문자 접수가 되지 않습니다. 대표전화 1644-4147로 전화 주세요.');
   }
 });
+function isMobile(){return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent));}
+function showPop(){document.getElementById('pop').classList.add('on');document.getElementById('popOk').focus();}
+document.getElementById('popOk').addEventListener('click',function(){document.getElementById('pop').classList.remove('on')});
 function openSms(body){
   var ios=/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)&&'ontouchend' in document;
   location.href='sms:'+SMS_TO+(ios?'&':'?')+'body='+encodeURIComponent(body);
